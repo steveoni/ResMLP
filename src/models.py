@@ -40,7 +40,7 @@ class PatchEmbed(nn.Module):
         return x
 
 class MlpBlock(nn.Module):
-    def __init__(self, dim, num_patch):
+    def __init__(self, dim, num_patch, layer_scale=1e-4):
         super().__init__()
 
         self.affine = Affine(dim)
@@ -48,15 +48,17 @@ class MlpBlock(nn.Module):
         self.linear_patch = nn.Linear(num_patch, num_patch)
         self.fc = MlpLayer(dim)
         self.post_affine = Affine(dim)
+        self.gamma = nn.Parameter(layer_scale * torch.ones((dim)), requires_grad=True)
+        self.beta = nn.Parameter(layer_scale * torch.ones((dim)), requires_grad=True)
 
     def forward(self, x):
         x = self.affine(x)
         x_t = x.transpose(1,2)
         x_t = self.linear_patch(x_t)
         x_t = x_t.transpose(1,2)
-        x = x + x_t
+        x = x + self.gamma * x_t
         x = self.post_affine(x)
-        x = x + self.fc(x)
+        x = x + self.beta * self.fc(x)
         return x
 
 class ResMLP(nn.Module):
